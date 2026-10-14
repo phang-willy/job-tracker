@@ -3,7 +3,6 @@ logs
 npm-debug.log*
 node_modules
 .env
-.env.*
 .output
 stats.html
 stats-*.json
