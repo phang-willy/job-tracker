@@ -17,7 +17,9 @@ function readGoogleClientId(): string | undefined {
 
   try {
     const envPath = resolve(dirname(fileURLToPath(import.meta.url)), '.env');
-    const value = parseEnv(readFileSync(envPath, 'utf8')).WXT_GOOGLE_CLIENT_ID?.trim();
+    const value = parseEnv(
+      readFileSync(envPath, 'utf8'),
+    ).WXT_GOOGLE_CLIENT_ID?.trim();
 
     return value ? value : undefined;
   } catch {

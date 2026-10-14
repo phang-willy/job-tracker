@@ -335,9 +335,7 @@ function StatusIcon({
         <LuCircleHelp className={className} role="img" aria-label={label} />
       );
     case 'bad':
-      return (
-        <LuCircleX className={className} role="img" aria-label={label} />
-      );
+      return <LuCircleX className={className} role="img" aria-label={label} />;
   }
 }
 
