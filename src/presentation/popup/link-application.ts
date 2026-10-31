@@ -31,6 +31,8 @@ export function linkFailureMessage(
       return invalidFieldMessage(result.field);
     case 'missing_sheet':
       return `L'onglet ${result.year} n'existe pas. Aucune ligne n'a été ajoutée.`;
+    case 'incompatible_sheet':
+      return `L'onglet ${result.year} n'a pas la structure attendue. Aucune ligne n'a été ajoutée.`;
     case 'unsorted':
       return "La colonne Postulé le n'est pas dans l'ordre, ou une date n'est pas lisible. Aucune ligne n'a été ajoutée.";
     case 'unconfirmed':

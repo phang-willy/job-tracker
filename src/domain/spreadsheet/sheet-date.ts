@@ -54,3 +54,49 @@ export function civilDatesFromColumn(
 ): string[] {
   return (values ?? []).map((row) => civilDateFromCell(row[0]));
 }
+
+export function appliedDatesForInsertion(
+  values: readonly unknown[][] | undefined,
+): string[] | null {
+  const rows = values ?? [];
+  let lastOccupied = -1;
+
+  for (let index = 0; index < rows.length; index += 1) {
+    if (!sheetCellIsBlank(rows[index]?.[0])) {
+      lastOccupied = index;
+    }
+  }
+
+  const dates: string[] = [];
+
+  for (let index = 0; index <= lastOccupied; index += 1) {
+    const cell = rows[index]?.[0];
+
+    if (sheetCellIsBlank(cell)) {
+      dates.push('');
+      continue;
+    }
+
+    const date = civilDateFromCell(cell);
+
+    if (date === '') {
+      return null;
+    }
+
+    dates.push(date);
+  }
+
+  return dates;
+}
+
+function sheetCellIsBlank(value: unknown): boolean {
+  if (value == null) {
+    return true;
+  }
+
+  if (typeof value === 'string') {
+    return value.trim() === '';
+  }
+
+  return false;
+}

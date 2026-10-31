@@ -105,6 +105,43 @@ describe('GoogleSheetsGateway insertApplication', () => {
     expect(JSON.stringify(body)).toContain(draft.url);
   });
 
+  it('does not send a batch when an occupied date cell is unreadable', async () => {
+    const fetchImpl = vi.fn<typeof fetch>(async (input) => {
+      const url = String(input);
+
+      if (url.includes('sheets.properties')) {
+        return json({
+          sheets: [{ properties: { title: '2026', sheetId: 42 } }],
+        });
+      }
+
+      if (url.includes('UNFORMATTED_VALUE')) {
+        return json({
+          valueRanges: [
+            {
+              values: [
+                [sheetSerialFromCivilDate('2026-01-01')],
+                ['not a date'],
+              ],
+            },
+          ],
+        });
+      }
+
+      return json({});
+    });
+    const gateway = new GoogleSheetsGateway(auth, fetchImpl);
+
+    await expect(gateway.insertApplication('sheet-id', draft)).resolves.toEqual(
+      { status: 'unsorted' },
+    );
+    expect(
+      fetchImpl.mock.calls.some((call) =>
+        String(call[0]).includes('batchUpdate'),
+      ),
+    ).toBe(false);
+  });
+
   it('does not send a batch when column H is not ordered', async () => {
     const fetchImpl = vi.fn<typeof fetch>(async (input) => {
       const url = String(input);

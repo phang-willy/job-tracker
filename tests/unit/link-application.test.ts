@@ -114,6 +114,42 @@ describe('LinkApplication', () => {
     );
   });
 
+  it('does not write into a year whose headers failed the check', async () => {
+    const insertApplication = vi.fn();
+
+    await expect(
+      new LinkApplication(
+        {
+          listApplications: () => Promise.resolve({ status: 'ok', rows: [] }),
+        },
+        { insertApplication },
+        {
+          load: () =>
+            Promise.resolve({
+              spreadsheetId: 'sheet',
+              url: 'https://docs.google.com/spreadsheets/d/sheet',
+              title: 'Suivi',
+              annualSheets: ['2025'],
+              writeAccess: 'verified',
+              years: [
+                { year: '2025', status: 'ok' },
+                { year: '2026', status: 'invalid' },
+                { year: '2027', status: 'missing' },
+              ],
+            }),
+          save: () => Promise.resolve(),
+          clear: () => Promise.resolve(),
+        },
+      ).execute(draft),
+    ).resolves.toEqual({ status: 'incompatible_sheet', year: '2026' });
+    expect(insertApplication).not.toHaveBeenCalled();
+    expect(
+      linkFailureMessage({ status: 'incompatible_sheet', year: '2026' }),
+    ).toBe(
+      "L'onglet 2026 n'a pas la structure attendue. Aucune ligne n'a été ajoutée.",
+    );
+  });
+
   it('reports an unsorted column without pretending the row was added', async () => {
     const result = await new LinkApplication(
       {

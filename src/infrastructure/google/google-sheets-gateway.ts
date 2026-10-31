@@ -13,7 +13,7 @@ import {
   applicationCells,
   type ApplicationDraft,
 } from '@/src/domain/spreadsheet/application-draft';
-import { civilDatesFromColumn } from '@/src/domain/spreadsheet/sheet-date';
+import { appliedDatesForInsertion } from '@/src/domain/spreadsheet/sheet-date';
 import { titlesToVerify } from '@/src/domain/spreadsheet/structure';
 import {
   annualSheetId,
@@ -366,9 +366,14 @@ export class GoogleSheetsGateway {
       return dates;
     }
 
-    const column = civilDatesFromColumn(
+    const column = appliedDatesForInsertion(
       dates.body.valueRanges?.[0]?.values as unknown[][] | undefined,
     );
+
+    if (column == null) {
+      return { status: 'unsorted' };
+    }
+
     const index = columnInsertionIndex(column, draft.appliedOn);
 
     if (index == null) {

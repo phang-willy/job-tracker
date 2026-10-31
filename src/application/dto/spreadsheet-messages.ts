@@ -88,6 +88,7 @@ export const linkApplicationResultSchema = z.discriminatedUnion('status', [
     field: z.enum(['company', 'title', 'url', 'date']),
   }),
   z.object({ status: z.literal('missing_sheet'), year: z.string() }),
+  z.object({ status: z.literal('incompatible_sheet'), year: z.string() }),
   z.object({ status: z.literal('unsorted') }),
   z.object({ status: z.literal('unconfirmed') }),
   z.object({ status: z.literal('not_configured') }),

@@ -15,6 +15,7 @@ import { sheetSerialFromCivilDate } from '@/src/domain/spreadsheet/sheet-date';
 export type LinkApplicationResult =
   | { status: 'found'; application: StoredApplication }
   | { status: 'invalid'; field: 'company' | 'title' | 'url' | 'date' }
+  | { status: 'incompatible_sheet'; year: string }
   | { status: 'unconfirmed' }
   | { status: 'not_configured' }
   | Exclude<ApplicationInsertResult, { status: 'inserted' }>;
@@ -50,6 +51,13 @@ export class LinkApplication {
 
     if (existing != null) {
       return { status: 'found', application: existing };
+    }
+
+    const year = draft.appliedOn.slice(0, 4);
+    const yearCheck = saved.years.find((item) => item.year === year);
+
+    if (yearCheck?.status === 'invalid') {
+      return { status: 'incompatible_sheet', year };
     }
 
     const inserted = await this.writer.insertApplication(
