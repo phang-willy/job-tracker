@@ -12,6 +12,7 @@ describe('SettingsPanel', () => {
         saved={null}
         onVerify={() => Promise.resolve({ status: 'invalid_url' })}
         onReverify={() => Promise.resolve({ status: 'invalid_url' })}
+        onDesync={() => Promise.resolve()}
       />,
     );
 
@@ -22,7 +23,7 @@ describe('SettingsPanel', () => {
     await user.click(screen.getByRole('button', { name: 'Vérifier' }));
 
     expect(
-      await screen.findByText('Cette URL n’est pas un classeur Google Sheets.'),
+      await screen.findByText("Cette URL n'est pas un classeur Google Sheets."),
     ).toBeVisible();
   });
 
@@ -43,6 +44,7 @@ describe('SettingsPanel', () => {
         saved={null}
         onVerify={onVerify}
         onReverify={() => Promise.resolve({ status: 'unavailable' })}
+        onDesync={() => Promise.resolve()}
       />,
     );
 
@@ -87,6 +89,7 @@ describe('SettingsPanel', () => {
           })
         }
         onReverify={() => Promise.resolve({ status: 'unavailable' })}
+        onDesync={() => Promise.resolve()}
       />,
     );
 
@@ -140,15 +143,111 @@ describe('SettingsPanel', () => {
         }}
         onVerify={onVerify}
         onReverify={onReverify}
+        onDesync={() => Promise.resolve()}
       />,
     );
 
     await user.click(screen.getByRole('button', { name: 'Revérifier' }));
 
-    expect(await screen.findByRole('img', { name: 'Refusée' })).toBeVisible();
+    expect(
+      await screen.findByRole('img', { name: 'Lecture seule' }),
+    ).toBeVisible();
     expect(onVerify).not.toHaveBeenCalled();
     expect(onReverify).toHaveBeenCalledWith(
       'https://docs.google.com/spreadsheets/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789abcd/edit',
     );
+    expect(screen.queryByRole('button', { name: 'Vérifier' })).toBeNull();
+  });
+
+  it('clears the saved spreadsheet instead of verifying again', async () => {
+    const onVerify = vi.fn();
+    const onDesync = vi.fn(() => Promise.resolve());
+    const user = userEvent.setup();
+
+    render(
+      <SettingsPanel
+        saved={{
+          spreadsheetId: '1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789abcd',
+          url: 'https://docs.google.com/spreadsheets/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789abcd/edit',
+          title: 'Candidatures',
+          annualSheets: ['2026'],
+          writeAccess: 'verified',
+          years: [],
+        }}
+        onVerify={onVerify}
+        onReverify={() => Promise.resolve({ status: 'unavailable' })}
+        onDesync={onDesync}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Désynchroniser' }));
+
+    expect(onDesync).toHaveBeenCalledOnce();
+    expect(onVerify).not.toHaveBeenCalled();
+    expect(await screen.findByLabelText('URL du classeur')).toHaveValue('');
+  });
+
+  it('says that a successful read does not prove write access', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <SettingsPanel
+        saved={null}
+        onVerify={() =>
+          Promise.resolve({
+            status: 'compatible',
+            spreadsheetId: '1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789abcd',
+            url: 'https://docs.google.com/spreadsheets/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789abcd/edit',
+            title: 'Candidatures',
+            annualSheets: ['2026'],
+            writeAccess: 'unverified',
+            years: [],
+          })
+        }
+        onReverify={() => Promise.resolve({ status: 'unavailable' })}
+        onDesync={() => Promise.resolve()}
+      />,
+    );
+
+    await user.type(
+      screen.getByLabelText('URL du classeur'),
+      'https://docs.google.com/spreadsheets/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789abcd/edit',
+    );
+    await user.click(screen.getByRole('button', { name: 'Vérifier' }));
+
+    expect(
+      await screen.findByText(
+        "Lecture confirmée — droits d'écriture non vérifiés",
+      ),
+    ).toBeVisible();
+  });
+
+  it('distinguishes a missing spreadsheet from a refused one', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <SettingsPanel
+        saved={null}
+        onVerify={() =>
+          Promise.resolve({
+            status: 'access_denied',
+            spreadsheetId: '1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789abcd',
+            notFound: true,
+          })
+        }
+        onReverify={() => Promise.resolve({ status: 'unavailable' })}
+        onDesync={() => Promise.resolve()}
+      />,
+    );
+
+    await user.type(
+      screen.getByLabelText('URL du classeur'),
+      'https://docs.google.com/spreadsheets/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789abcd/edit',
+    );
+    await user.click(screen.getByRole('button', { name: 'Vérifier' }));
+
+    expect(
+      await screen.findByText('Ce classeur est introuvable.'),
+    ).toBeVisible();
   });
 });

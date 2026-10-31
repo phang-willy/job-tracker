@@ -4,6 +4,7 @@ import { parseEnv } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'wxt';
+import { GOOGLE_OAUTH_SCOPES } from './src/infrastructure/google/google-oauth-redirect';
 import { extensionHostPermissions } from './src/infrastructure/platforms/supported-hosts';
 
 const googleClientId = readGoogleClientId();
@@ -39,22 +40,22 @@ export default defineConfig({
       ? {
           oauth2: {
             client_id: googleClientId,
-            scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+            scopes: [...GOOGLE_OAUTH_SCOPES],
           },
         }
       : {}),
     icons: {
-      16: '/images/icon-16.png',
-      32: '/images/icon-32.png',
-      48: '/images/icon-48.png',
-      128: '/images/icon-128.png',
+      16: '/images/logo-16.png',
+      32: '/images/logo-32.png',
+      48: '/images/logo-48.png',
+      128: '/images/logo-128.png',
     },
     action: {
       default_icon: {
-        16: '/images/icon-16.png',
-        32: '/images/icon-32.png',
-        48: '/images/icon-48.png',
-        128: '/images/icon-128.png',
+        16: '/images/logo-16.png',
+        32: '/images/logo-32.png',
+        48: '/images/logo-48.png',
+        128: '/images/logo-128.png',
       },
     },
   },

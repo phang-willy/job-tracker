@@ -22,4 +22,27 @@ export default tseslint.config(
     ...reactHooks.configs.flat.recommended,
   },
   prettier,
+  {
+    files: ['src/**/*.{ts,tsx}', 'entrypoints/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'zod',
+              message:
+                'Import z from @/src/infrastructure/zod so extension CSP never hits Zod eval.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['src/infrastructure/zod.ts'],
+    rules: {
+      'no-restricted-imports': 'off',
+    },
+  },
 );

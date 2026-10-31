@@ -19,4 +19,8 @@ export class ChromeSpreadsheetSettingsStore implements SpreadsheetSettingsReposi
 
     return parsed.success ? parsed.data : null;
   }
+
+  async clear(): Promise<void> {
+    await browser.storage.local.remove(STORAGE_KEY);
+  }
 }

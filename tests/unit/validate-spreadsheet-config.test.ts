@@ -36,6 +36,10 @@ function memorySettings(): SpreadsheetSettingsRepository & {
     load() {
       return Promise.resolve(store.saved);
     },
+    clear() {
+      store.saved = null;
+      return Promise.resolve();
+    },
   };
 }
 
@@ -136,7 +140,30 @@ describe('ValidateSpreadsheetConfig', () => {
     expect(settings.saved?.writeAccess).toBe('denied');
   });
 
-  it('does not save when the write check cannot reach Google', async () => {
+  it('saves a readable spreadsheet when write rights stay unverified', async () => {
+    const settings = memorySettings();
+    const useCase = new ValidateSpreadsheetConfig(
+      reader(
+        {
+          status: 'ok',
+          title: 'Candidatures',
+          annualTitles: ['2026'],
+          sheets: [compatibleSheet],
+        },
+        { status: 'unverified' },
+      ),
+      settings,
+      during2026,
+    );
+
+    await expect(useCase.execute(spreadsheetUrl)).resolves.toMatchObject({
+      status: 'compatible',
+      writeAccess: 'unverified',
+    });
+    expect(settings.saved?.writeAccess).toBe('unverified');
+  });
+
+  it('keeps a readable spreadsheet when the capability check cannot reach Google', async () => {
     const settings = memorySettings();
     const useCase = new ValidateSpreadsheetConfig(
       reader(
@@ -152,9 +179,31 @@ describe('ValidateSpreadsheetConfig', () => {
       during2026,
     );
 
+    await expect(useCase.execute(spreadsheetUrl)).resolves.toMatchObject({
+      status: 'compatible',
+      writeAccess: 'unverified',
+    });
+    expect(settings.saved?.writeAccess).toBe('unverified');
+  });
+
+  it('does not save when the Google token is expired', async () => {
+    const settings = memorySettings();
+    const useCase = new ValidateSpreadsheetConfig(
+      reader(
+        {
+          status: 'ok',
+          title: 'Candidatures',
+          annualTitles: ['2026'],
+          sheets: [compatibleSheet],
+        },
+        { status: 'unauthenticated' },
+      ),
+      settings,
+      during2026,
+    );
+
     await expect(useCase.execute(spreadsheetUrl)).resolves.toEqual({
-      status: 'unavailable',
-      detail: '503',
+      status: 'unauthenticated',
     });
     expect(settings.saved).toBeNull();
   });
@@ -225,6 +274,68 @@ describe('ValidateSpreadsheetConfig', () => {
       year: '2026',
       status: 'missing',
     });
+  });
+
+  it('reports a missing spreadsheet without saving it', async () => {
+    const settings = memorySettings();
+    const useCase = new ValidateSpreadsheetConfig(
+      reader({ status: 'access_denied', notFound: true }),
+      settings,
+      during2026,
+    );
+
+    await expect(useCase.execute(spreadsheetUrl)).resolves.toEqual({
+      status: 'access_denied',
+      spreadsheetId: '1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789abcd',
+      notFound: true,
+    });
+    expect(settings.saved).toBeNull();
+  });
+
+  it('does not save when Google Sheets cannot be reached', async () => {
+    const settings = memorySettings();
+    const useCase = new ValidateSpreadsheetConfig(
+      reader({ status: 'unavailable', detail: 'Failed to fetch' }),
+      settings,
+      during2026,
+    );
+
+    await expect(useCase.execute(spreadsheetUrl)).resolves.toEqual({
+      status: 'unavailable',
+      detail: 'Failed to fetch',
+    });
+    expect(settings.saved).toBeNull();
+  });
+
+  it('keeps a write that already succeeded when Drive cannot recheck it', async () => {
+    const settings = memorySettings();
+    await settings.save({
+      spreadsheetId: '1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789abcd',
+      url: spreadsheetUrl,
+      title: 'Candidatures',
+      annualSheets: ['2026'],
+      writeAccess: 'verified',
+      years: [],
+    });
+    const useCase = new ValidateSpreadsheetConfig(
+      reader(
+        {
+          status: 'ok',
+          title: 'Candidatures',
+          annualTitles: ['2026'],
+          sheets: [compatibleSheet],
+        },
+        { status: 'unverified' },
+      ),
+      settings,
+      during2026,
+    );
+
+    await expect(useCase.execute(spreadsheetUrl)).resolves.toMatchObject({
+      status: 'compatible',
+      writeAccess: 'verified',
+    });
+    expect(settings.saved?.writeAccess).toBe('verified');
   });
 
   it('reports a refused spreadsheet without saving it', async () => {

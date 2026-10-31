@@ -25,7 +25,7 @@ describe('Google OAuth redirect', () => {
       'https://abc.chromiumapp.org/',
     );
     expect(url.searchParams.get('scope')).toBe(
-      'https://www.googleapis.com/auth/spreadsheets',
+      'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.metadata.readonly',
     );
   });
 

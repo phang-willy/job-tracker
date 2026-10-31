@@ -1,8 +1,9 @@
 @import '../../src/presentation/shared/theme.css';
 
-html,
-body,
+body, html, #root{
+  @apply w-xl min-h-75 max-h-144.25 overflow-y-auto;
+}
+
 #root {
-  width: 580px;
-  min-height: 300px;
+  @apply relative;
 }
