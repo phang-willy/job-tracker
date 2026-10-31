@@ -44,6 +44,7 @@ export class ValidateSpreadsheetConfig {
         ...(read.cause === 'sheets_api_disabled'
           ? { cause: 'sheets_api_disabled' as const }
           : {}),
+        ...(read.notFound === true ? { notFound: true as const } : {}),
       });
     }
 
@@ -89,8 +90,11 @@ export class ValidateSpreadsheetConfig {
     const write = await this.sheets.probeWriteAccess(spreadsheetId);
     logVerify('validate.write', write);
 
-    if (write.status !== 'ok' && write.status !== 'denied') {
-      return finish(writeFailure(spreadsheetId, write));
+    if (
+      write.status === 'unauthenticated' ||
+      write.status === 'oauth_not_configured'
+    ) {
+      return finish({ status: write.status });
     }
 
     const saved: SavedSpreadsheetSettings = {
@@ -100,7 +104,10 @@ export class ValidateSpreadsheetConfig {
       annualSheets: assessed.years
         .filter((item) => item.status === 'ok')
         .map((item) => item.year),
-      writeAccess: write.status === 'ok' ? 'verified' : 'denied',
+      writeAccess: await this.confirmedWriteAccess(
+        spreadsheetId,
+        writeAccessFromProbe(write.status),
+      ),
       years: assessed.years,
     };
 
@@ -116,27 +123,39 @@ export class ValidateSpreadsheetConfig {
       years: saved.years,
     });
   }
+
+  private async confirmedWriteAccess(
+    spreadsheetId: string,
+    probed: SavedSpreadsheetSettings['writeAccess'],
+  ): Promise<SavedSpreadsheetSettings['writeAccess']> {
+    if (probed !== 'unverified') {
+      return probed;
+    }
+
+    const previous = await this.settings.load();
+
+    if (
+      previous != null &&
+      previous.spreadsheetId === spreadsheetId &&
+      previous.writeAccess === 'verified'
+    ) {
+      return 'verified';
+    }
+
+    return 'unverified';
+  }
 }
 
-function writeFailure(
-  spreadsheetId: string,
-  write: Exclude<WriteProbe, { status: 'ok' | 'denied' }>,
-): ValidateSpreadsheetResult {
-  if (write.status === 'access_denied') {
-    return {
-      status: 'access_denied',
-      spreadsheetId,
-      ...(write.cause === 'sheets_api_disabled'
-        ? { cause: 'sheets_api_disabled' as const }
-        : {}),
-    };
+function writeAccessFromProbe(
+  status: WriteProbe['status'],
+): SavedSpreadsheetSettings['writeAccess'] {
+  if (status === 'ok') {
+    return 'verified';
   }
 
-  if (write.status === 'unavailable') {
-    return write.detail == null
-      ? { status: 'unavailable' }
-      : { status: 'unavailable', detail: write.detail };
+  if (status === 'denied') {
+    return 'denied';
   }
 
-  return { status: write.status };
+  return 'unverified';
 }

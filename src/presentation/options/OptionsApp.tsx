@@ -10,6 +10,7 @@ export function OptionsApp() {
         saved={settings.saved}
         onVerify={settings.verify}
         onReverify={settings.reverify}
+        onDesync={settings.desync}
       />
     </main>
   );

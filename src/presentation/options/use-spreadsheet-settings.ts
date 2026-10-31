@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { SavedSpreadsheetSettings } from '@/src/application/dto/spreadsheet-messages';
 import {
+  desyncSpreadsheet,
   loadSpreadsheetSettings,
   reverifySpreadsheet,
   verifySpreadsheet,
@@ -8,10 +9,13 @@ import {
 
 export function useSpreadsheetSettings(): {
   saved: SavedSpreadsheetSettings | null;
+  ready: boolean;
   verify: typeof verifySpreadsheet;
   reverify: typeof reverifySpreadsheet;
+  desync: typeof desyncSpreadsheet;
 } {
   const [saved, setSaved] = useState<SavedSpreadsheetSettings | null>(null);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -20,11 +24,13 @@ export function useSpreadsheetSettings(): {
       .then((settings) => {
         if (!cancelled) {
           setSaved(settings);
+          setReady(true);
         }
       })
       .catch(() => {
         if (!cancelled) {
           setSaved(null);
+          setReady(true);
         }
       });
 
@@ -54,5 +60,11 @@ export function useSpreadsheetSettings(): {
     };
   }, []);
 
-  return { saved, verify: verifySpreadsheet, reverify: reverifySpreadsheet };
+  return {
+    saved,
+    ready,
+    verify: verifySpreadsheet,
+    reverify: reverifySpreadsheet,
+    desync: desyncSpreadsheet,
+  };
 }

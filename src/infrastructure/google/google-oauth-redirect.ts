@@ -1,6 +1,16 @@
 export const SHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
 
+export const DRIVE_METADATA_READONLY_SCOPE =
+  'https://www.googleapis.com/auth/drive.metadata.readonly';
+
+export const GOOGLE_OAUTH_SCOPES = [
+  SHEETS_SCOPE,
+  DRIVE_METADATA_READONLY_SCOPE,
+] as const;
+
 const EXPIRY_MARGIN_MS = 60_000;
+
+export const GOOGLE_TOKEN_LIFETIME_MS = 12 * 60 * 60 * 1000;
 
 export function buildGoogleAuthUrl(input: {
   clientId: string;
@@ -11,7 +21,7 @@ export function buildGoogleAuthUrl(input: {
   url.searchParams.set('client_id', input.clientId);
   url.searchParams.set('redirect_uri', input.redirectUri);
   url.searchParams.set('response_type', 'token');
-  url.searchParams.set('scope', input.scope ?? SHEETS_SCOPE);
+  url.searchParams.set('scope', input.scope ?? GOOGLE_OAUTH_SCOPES.join(' '));
   url.searchParams.set('include_granted_scopes', 'true');
 
   return url.href;

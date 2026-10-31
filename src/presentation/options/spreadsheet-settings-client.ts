@@ -35,6 +35,11 @@ export async function verifySpreadsheet(
   return runSpreadsheetCheck(url, true);
 }
 
+export async function desyncSpreadsheet(): Promise<void> {
+  await new ChromeGoogleAuth().disconnect();
+  await browser.runtime.sendMessage({ type: 'clear-spreadsheet-settings' });
+}
+
 export async function reverifySpreadsheet(
   url: string,
 ): Promise<SettingsCheckResult> {

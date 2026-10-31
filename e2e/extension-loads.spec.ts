@@ -32,8 +32,9 @@ test('the popup keeps settings in a tab and stays 580 by 400', async () => {
     await expect(
       popup.getByRole('heading', { name: 'Job Tracker' }),
     ).toBeVisible();
+    await expect(popup.getByLabel('Société')).toBeVisible();
     await expect(
-      popup.getByRole('heading', { name: 'Onglet actif' }),
+      popup.getByText("Cette page n'est pas encore prise en charge."),
     ).toBeVisible();
 
     const shell = popup.locator('main');

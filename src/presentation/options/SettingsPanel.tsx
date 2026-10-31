@@ -2,15 +2,15 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { LuCircleCheck, LuCircleHelp, LuCircleX, LuInfo } from 'react-icons/lu';
-import { z } from 'zod';
 import type {
   SavedSpreadsheetSettings,
   ValidateSpreadsheetResult,
 } from '@/src/application/dto/spreadsheet-messages';
 import type { YearCheck } from '@/src/domain/spreadsheet/structure';
+import { z } from '@/src/infrastructure/zod';
 
 const formSchema = z.object({
-  spreadsheetUrl: z.string().trim().min(1, 'Colle l’URL du classeur.'),
+  spreadsheetUrl: z.string().trim().min(1, "Colle l'URL du classeur."),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -24,13 +24,17 @@ export function SettingsPanel({
   saved,
   onVerify,
   onReverify,
+  onDesync,
 }: {
   saved: SavedSpreadsheetSettings | null;
   onVerify: (url: string) => Promise<SettingsCheckResult>;
   onReverify: (url: string) => Promise<SettingsCheckResult>;
+  onDesync: () => Promise<void>;
 }) {
   const [result, setResult] = useState<SettingsCheckResult | null>(null);
-  const [pending, setPending] = useState<'verify' | 'reverify' | null>(null);
+  const [pending, setPending] = useState<
+    'verify' | 'reverify' | 'desync' | null
+  >(null);
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: { spreadsheetUrl: '' },
@@ -62,12 +66,33 @@ export function SettingsPanel({
       });
   }
 
+  function desync(): Promise<void> {
+    setPending('desync');
+
+    return onDesync()
+      .then(() => {
+        setResult(null);
+        form.reset({ spreadsheetUrl: '' });
+      })
+      .catch(() => {
+        setResult({ status: 'unavailable' });
+      })
+      .finally(() => {
+        setPending(null);
+      });
+  }
+
   return (
     <section>
       <h2 className="text-base font-semibold">Paramètres</h2>
       <form
         className="mt-3"
         onSubmit={(event) => {
+          if (saved !== null) {
+            event.preventDefault();
+            return;
+          }
+
           void form.handleSubmit((values) =>
             check(values.spreadsheetUrl, 'verify'),
           )(event);
@@ -89,13 +114,26 @@ export function SettingsPanel({
           </p>
         ) : null}
         <div className="mt-3 flex items-center justify-between">
-          <button
-            type="submit"
-            className="rounded-md bg-neutral-900 px-3 py-2 font-medium text-white hover:cursor-pointer hover:bg-neutral-800 focus:ring-2 focus:ring-neutral-500 focus:ring-offset-2 focus:outline-none disabled:opacity-60"
-            disabled={pending !== null}
-          >
-            {pending === 'verify' ? 'Vérification…' : 'Vérifier'}
-          </button>
+          {saved === null ? (
+            <button
+              type="submit"
+              className="rounded-md bg-neutral-900 px-3 py-2 font-medium text-white hover:cursor-pointer hover:bg-neutral-800 focus:ring-2 focus:ring-neutral-500 focus:ring-offset-2 focus:outline-none disabled:opacity-60"
+              disabled={pending !== null}
+            >
+              {pending === 'verify' ? 'Vérification…' : 'Vérifier'}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="rounded-md bg-neutral-900 px-3 py-2 font-medium text-white hover:cursor-pointer hover:bg-neutral-800 focus:ring-2 focus:ring-neutral-500 focus:ring-offset-2 focus:outline-none disabled:opacity-60"
+              disabled={pending !== null}
+              onClick={() => {
+                void desync();
+              }}
+            >
+              {pending === 'desync' ? 'Désynchronisation…' : 'Désynchroniser'}
+            </button>
+          )}
           {saved !== null ? (
             <button
               type="button"
@@ -140,7 +178,7 @@ export function CheckResult({ result }: { result: SettingsCheckResult }) {
   if (result.status === 'consent_window') {
     return (
       <p>
-        Une fenêtre de connexion est ouverte. Termine l’autorisation Google
+        Une fenêtre de connexion est ouverte. Termine l'autorisation Google
         dedans.
       </p>
     );
@@ -150,22 +188,31 @@ export function CheckResult({ result }: { result: SettingsCheckResult }) {
     return <p>{result.detail}</p>;
   }
 
+  if (result.status === 'access_denied' && result.notFound === true) {
+    return <p>Ce classeur est introuvable.</p>;
+  }
+
   if (
     result.status === 'access_denied' &&
     result.cause === 'sheets_api_disabled'
   ) {
     return (
       <p>
-        Active l’API Google Sheets dans le projet Google Cloud, puis réessaie.
+        Active l'API Google Sheets dans le projet Google Cloud, puis réessaie.
       </p>
     );
   }
 
-  if (result.status === 'unavailable' && result.detail != null) {
+  if (result.status === 'unavailable') {
+    const http =
+      result.detail != null && /^\d{3}$/.test(result.detail)
+        ? ` (HTTP ${result.detail})`
+        : '';
+
     return (
       <p>
-        Google Sheets est temporairement inaccessible.
-        {/^\d{3}$/.test(result.detail) ? ` (HTTP ${result.detail})` : ''}
+        Erreur réseau. Google Sheets est temporairement inaccessible.
+        {http}
       </p>
     );
   }
@@ -210,6 +257,11 @@ function SpreadsheetSummary({
             label="Écriture"
             tone={writeAccessTone(writeAccess)}
             iconLabel={writeAccessLabel(writeAccess)}
+            detail={
+              writeAccess === 'unverified'
+                ? "Lecture confirmée — droits d'écriture non vérifiés"
+                : undefined
+            }
           />
         )}
       </dl>
@@ -301,15 +353,20 @@ function StatusRow({
   label,
   tone,
   iconLabel,
+  detail,
 }: {
   label: string;
   tone: 'ok' | 'pending' | 'bad';
   iconLabel: string;
+  detail?: string;
 }) {
   return (
     <div className="flex items-center justify-between gap-4">
       <dt>{label}</dt>
-      <dd>
+      <dd className="flex items-center gap-2 text-right">
+        {detail == null ? null : (
+          <span className={toneClass(tone)}>{detail}</span>
+        )}
         <StatusIcon tone={tone} label={iconLabel} />
       </dd>
     </div>
@@ -357,7 +414,7 @@ function writeAccessLabel(
     case 'verified':
       return 'OK';
     case 'denied':
-      return 'Refusée';
+      return 'Lecture seule';
     case 'unverified':
       return 'Non vérifiée';
     default:
@@ -388,14 +445,14 @@ function describeStatus(
 ): string {
   switch (status) {
     case 'invalid_url':
-      return 'Cette URL n’est pas un classeur Google Sheets.';
+      return "Cette URL n'est pas un classeur Google Sheets.";
     case 'access_denied':
-      return 'Accès refusé ou classeur introuvable.';
+      return 'Accès refusé.';
     case 'unauthenticated':
       return 'Connexion Google requise.';
     case 'oauth_not_configured':
-      return 'La connexion Google n’est pas configurée.';
+      return "La connexion Google n'est pas configurée.";
     case 'unavailable':
-      return 'Google Sheets est temporairement inaccessible.';
+      return 'Erreur réseau. Google Sheets est temporairement inaccessible.';
   }
 }
