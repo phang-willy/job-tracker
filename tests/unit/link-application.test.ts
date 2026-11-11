@@ -165,7 +165,7 @@ describe('LinkApplication', () => {
 
     if (result.status === 'unsorted') {
       expect(linkFailureMessage(result)).toBe(
-        "La colonne Postulé le n'est pas dans l'ordre, ou une date n'est pas lisible. Aucune ligne n'a été ajoutée.",
+        "La colonne Postulé le doit aller du 1er janvier vers le 31 décembre. Une date illisible ou l'ordre inverse bloque l'ajout.",
       );
     }
   });
@@ -186,6 +186,54 @@ describe('LinkApplication', () => {
         settings,
       ).execute(draft),
     ).resolves.toEqual({ status: 'found', application: stored });
+  });
+
+  it('does not insert from a stale copy when the fresh read fails', async () => {
+    const insertApplication = vi.fn();
+    const listApplications = vi.fn(() =>
+      Promise.resolve({ status: 'ok' as const, rows: [] }),
+    );
+
+    await expect(
+      new LinkApplication(
+        { listApplications },
+        { insertApplication },
+        settings,
+        { execute: () => Promise.resolve('failed') },
+      ).execute(draft),
+    ).resolves.toEqual({
+      status: 'unavailable',
+      detail: 'La synchronisation du tableur a échoué.',
+    });
+    expect(insertApplication).not.toHaveBeenCalled();
+    expect(listApplications).not.toHaveBeenCalled();
+  });
+
+  it('refreshes the stored copy before the write and again before the reread', async () => {
+    const execute = vi.fn(() => Promise.resolve('synced'));
+    const insertApplication = vi.fn(() =>
+      Promise.resolve({ status: 'inserted' as const }),
+    );
+    const listApplications = vi
+      .fn()
+      .mockResolvedValueOnce({ status: 'ok', rows: [] })
+      .mockResolvedValueOnce({ status: 'ok', rows: [stored] });
+
+    await expect(
+      new LinkApplication(
+        { listApplications },
+        { insertApplication },
+        settings,
+        { execute },
+      ).execute(draft),
+    ).resolves.toEqual({ status: 'found', application: stored });
+
+    const insertedAt = insertApplication.mock.invocationCallOrder[0];
+    const refreshedAt = execute.mock.invocationCallOrder;
+
+    expect(execute).toHaveBeenCalledTimes(2);
+    expect(refreshedAt[0]).toBeLessThan(insertedAt ?? 0);
+    expect(refreshedAt[1]).toBeGreaterThan(insertedAt ?? 0);
   });
 
   it('refuses an empty company before calling the sheet', async () => {

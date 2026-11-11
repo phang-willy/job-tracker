@@ -60,7 +60,7 @@ export function chronologicalInsertionIndex(
     const previous = dates[index - 1];
     const current = dates[index];
 
-    if (previous === undefined || current === undefined || current < previous) {
+    if (previous == null || current == null || current < previous) {
       return null;
     }
   }

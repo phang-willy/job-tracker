@@ -172,6 +172,12 @@ function ownText(element: Element): string {
 }
 
 function blockText(heading: Element): string {
+  const item = lastStatusItem(heading);
+
+  if (item != null) {
+    return collapseWhitespace(item.textContent ?? '');
+  }
+
   const following = textAfter(heading);
   const parent = heading.parentElement;
   const aroundParent = parent === null ? '' : textAfter(parent);
@@ -184,6 +190,54 @@ function blockText(heading: Element): string {
   }
 
   return following;
+}
+
+function lastStatusItem(heading: Element): Element | null {
+  let current: Element | null = heading;
+
+  for (let depth = 0; current != null && depth < 2; depth += 1) {
+    const list = followingList(current);
+
+    if (list != null) {
+      const items = [...list.children].filter(
+        (child) => child.tagName === 'LI',
+      );
+
+      return items[items.length - 1] ?? null;
+    }
+
+    const parent: HTMLElement | null = current.parentElement;
+
+    if (parent == null || parent === current.ownerDocument.body) {
+      break;
+    }
+
+    current = parent;
+  }
+
+  return null;
+}
+
+function followingList(element: Element): Element | null {
+  let sibling = element.nextElementSibling;
+
+  while (sibling != null && !/^H[1-3]$/.test(sibling.tagName)) {
+    if (sibling.tagName === 'UL' || sibling.tagName === 'OL') {
+      return sibling;
+    }
+
+    const nested = [...sibling.children].find(
+      (child) => child.tagName === 'UL' || child.tagName === 'OL',
+    );
+
+    if (nested != null) {
+      return nested;
+    }
+
+    sibling = sibling.nextElementSibling;
+  }
+
+  return null;
 }
 
 function textAfter(heading: Element): string {

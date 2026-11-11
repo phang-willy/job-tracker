@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { applicationWriteRequests } from '@/src/infrastructure/google/application-write-request';
+import {
+  applicationWriteRequests,
+  rowPaint,
+  zebraGridIndexesAfterInsert,
+} from '@/src/infrastructure/google/application-write-request';
 
 describe('application row colors', () => {
   it('paints an even sheet row white and the link blue', () => {
@@ -20,6 +24,40 @@ describe('application row colors', () => {
 
   it('paints an odd sheet row with the zebra gray', () => {
     expect(rowColors(184).background).toEqual(sheetColor('#f6f8f9'));
+  });
+});
+
+describe('row backgrounds around an insert', () => {
+  it('treats white, zebra gray, and an empty row as zebra', () => {
+    expect(rowPaint([{ red: 1, green: 1, blue: 1 }])).toBe('zebra');
+    expect(
+      rowPaint([
+        {
+          red: 246 / 255,
+          green: 248 / 255,
+          blue: 249 / 255,
+        },
+      ]),
+    ).toBe('zebra');
+    expect(rowPaint([])).toBe('zebra');
+    expect(rowPaint([null])).toBe('zebra');
+  });
+
+  it('keeps a row whose cells are not one zebra color', () => {
+    expect(rowPaint([{ red: 1, green: 0.8, blue: 0.4 }])).toBe('custom');
+    expect(
+      rowPaint([
+        { red: 1, green: 1, blue: 1 },
+        { red: 1, green: 0.8, blue: 0.4 },
+      ]),
+    ).toBe('custom');
+  });
+
+  it('repaints the new row and shifted zebra rows only', () => {
+    expect(
+      zebraGridIndexesAfterInsert(['zebra', 'custom', 'zebra'], 1),
+    ).toEqual([2, 4]);
+    expect(zebraGridIndexesAfterInsert(['custom'], 1)).toEqual([2]);
   });
 });
 

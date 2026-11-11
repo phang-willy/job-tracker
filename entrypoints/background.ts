@@ -1,5 +1,6 @@
 import { createContainer } from '@/src/composition/create-container';
 import { readJobBoardBadgeMessage } from '@/src/domain/job-offer/job-board-badge';
+import { startSpreadsheetSync } from '@/src/infrastructure/chrome/start-spreadsheet-sync';
 import { logVerify } from '@/src/infrastructure/logging/verify-log';
 import { isRecognizedJobBoardUrl } from '@/src/infrastructure/platforms/supported-hosts';
 import { paintJobBoardBadge } from '@/src/presentation/badge/paint-job-board-badge';
@@ -7,6 +8,8 @@ import { handleSpreadsheetMessage } from '@/src/presentation/messaging/handle-sp
 
 export default defineBackground(() => {
   const container = createContainer();
+
+  startSpreadsheetSync(container.syncApplicationCatalog);
 
   browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const badge = readJobBoardBadgeMessage(message);

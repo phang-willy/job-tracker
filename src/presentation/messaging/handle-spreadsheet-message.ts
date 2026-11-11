@@ -1,7 +1,11 @@
 import type { FindExistingApplication } from '@/src/application/use-cases/find-existing-application';
 import type { LinkApplication } from '@/src/application/use-cases/link-application';
 import type { ValidateSpreadsheetConfig } from '@/src/application/use-cases/validate-spreadsheet-config';
-import type { SpreadsheetSettingsRepository } from '@/src/application/ports/spreadsheet';
+import type {
+  ApplicationSnapshotStore,
+  SpreadsheetSettingsRepository,
+  SyncFailureNotifier,
+} from '@/src/application/ports/spreadsheet';
 import { spreadsheetMessageSchema } from '@/src/application/dto/spreadsheet-messages';
 import { logVerify } from '@/src/infrastructure/logging/verify-log';
 
@@ -10,6 +14,9 @@ type SpreadsheetHandlers = {
   findExistingApplication: FindExistingApplication;
   linkApplication: LinkApplication;
   settings: SpreadsheetSettingsRepository;
+  snapshots: ApplicationSnapshotStore;
+  syncApplicationCatalog: { execute(): Promise<unknown> };
+  syncNotifier: SyncFailureNotifier;
 };
 
 export async function handleSpreadsheetMessage(
@@ -29,6 +36,8 @@ export async function handleSpreadsheetMessage(
 
   if (parsed.data.type === 'clear-spreadsheet-settings') {
     await handlers.settings.clear();
+    await handlers.snapshots.clear();
+    await handlers.syncNotifier.cleared();
     return { status: 'cleared' };
   }
 
@@ -50,6 +59,10 @@ export async function handleSpreadsheetMessage(
     parsed.data.url,
   );
   logVerify('message.out', result);
+
+  if (result.status === 'compatible') {
+    await handlers.syncApplicationCatalog.execute();
+  }
 
   return result;
 }
