@@ -34,7 +34,14 @@ export default defineConfig({
     name: 'Job Tracker',
     description:
       'Suivi des candidatures LinkedIn, Indeed, HelloWork et Welcome to the Jungle.',
-    permissions: ['storage', 'identity', 'alarms', 'activeTab', 'windows'],
+    permissions: [
+      'storage',
+      'identity',
+      'alarms',
+      'notifications',
+      'activeTab',
+      'windows',
+    ],
     host_permissions: [...extensionHostPermissions],
     ...(googleClientId
       ? {

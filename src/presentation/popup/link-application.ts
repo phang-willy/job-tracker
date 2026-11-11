@@ -34,7 +34,7 @@ export function linkFailureMessage(
     case 'incompatible_sheet':
       return `L'onglet ${result.year} n'a pas la structure attendue. Aucune ligne n'a été ajoutée.`;
     case 'unsorted':
-      return "La colonne Postulé le n'est pas dans l'ordre, ou une date n'est pas lisible. Aucune ligne n'a été ajoutée.";
+      return "La colonne Postulé le doit aller du 1er janvier vers le 31 décembre. Une date illisible ou l'ordre inverse bloque l'ajout.";
     case 'unconfirmed':
       return "La ligne n'a pas été retrouvée dans le tableur après l'envoi.";
     case 'not_configured':

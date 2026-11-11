@@ -144,6 +144,65 @@ describe('LinkedInApplicationStatusDetector', () => {
     });
   });
 
+  it('reads the application date from the last status row', () => {
+    mount(`
+      <div>
+        <div>
+          <div>
+            <h2>Statut de la demande<span data-job-offer-sync=""></span></h2>
+          </div>
+          <ul>
+            <li>
+              <p>Candidature vue</p>
+              <p>il y a 12 heures</p>
+            </li>
+            <li>
+              <p>Candidature envoyée</p>
+              <p>il y a 1 jour</p>
+              <a href="https://www.linkedin.com/ambry/">Voir le CV</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    `);
+
+    expect(detector.detect(document)).toEqual({
+      state: 'applied',
+      statusLabel: 'Candidature envoyée',
+      relativeDate: 'il y a 1 jour',
+    });
+  });
+
+  it('reads a status written in paragraphs when no list follows the heading', () => {
+    mount(`
+      <div>
+        <div>
+          <div></div>
+          <div>
+            <h2>Statut de la demande<span data-job-offer-sync=""></span></h2>
+          </div>
+          <div>
+            <div></div>
+            <div>
+              <p>Candidature envoyée</p>
+              <p>il y a 1 jour</p>
+              <p><a href="https://www.linkedin.com/ambry/">Voir le CV</a></p>
+            </div>
+          </div>
+        </div>
+        <ul>
+          <li>il y a 3 semaines</li>
+        </ul>
+      </div>
+    `);
+
+    expect(detector.detect(document)).toEqual({
+      state: 'applied',
+      statusLabel: 'Candidature envoyée',
+      relativeDate: 'il y a 1 jour',
+    });
+  });
+
   it('reads a sent application when the status label is not a heading', () => {
     mount(`
       <div>

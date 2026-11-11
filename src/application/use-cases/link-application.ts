@@ -1,6 +1,7 @@
 import type { SavedSpreadsheetSettings } from '@/src/application/dto/spreadsheet-messages';
 import type {
   ApplicationCatalog,
+  ApplicationCatalogRead,
   ApplicationInsertResult,
   ApplicationWriter,
   SpreadsheetSettingsRepository,
@@ -25,6 +26,7 @@ export class LinkApplication {
     private readonly catalog: ApplicationCatalog,
     private readonly writer: ApplicationWriter,
     private readonly settings: SpreadsheetSettingsRepository,
+    private readonly refreshCatalog?: { execute(): Promise<unknown> },
   ) {}
 
   async execute(input: ApplicationDraft): Promise<LinkApplicationResult> {
@@ -41,7 +43,7 @@ export class LinkApplication {
       return { status: 'not_configured' };
     }
 
-    const listed = await this.catalog.listApplications(saved.spreadsheetId);
+    const listed = await this.listed(saved.spreadsheetId);
 
     if (listed.status !== 'ok') {
       return listed;
@@ -95,11 +97,17 @@ export class LinkApplication {
     await this.settings.save({ ...saved, writeAccess });
   }
 
+  private async listed(spreadsheetId: string): Promise<ApplicationCatalogRead> {
+    await this.refreshCatalog?.execute();
+
+    return this.catalog.listApplications(spreadsheetId);
+  }
+
   private async readBack(
     spreadsheetId: string,
     url: string,
   ): Promise<LinkApplicationResult> {
-    const listed = await this.catalog.listApplications(spreadsheetId);
+    const listed = await this.listed(spreadsheetId);
 
     if (listed.status !== 'ok') {
       return listed;
@@ -116,7 +124,7 @@ export class LinkApplication {
     spreadsheetId: string,
     url: string,
   ): Promise<LinkApplicationResult | null> {
-    const listed = await this.catalog.listApplications(spreadsheetId);
+    const listed = await this.listed(spreadsheetId);
 
     if (listed.status !== 'ok') {
       return null;

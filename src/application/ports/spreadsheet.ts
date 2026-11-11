@@ -42,6 +42,24 @@ export interface ApplicationCatalog {
   listApplications(spreadsheetId: string): Promise<ApplicationCatalogRead>;
 }
 
+export interface RefreshableApplicationCatalog extends ApplicationCatalog {
+  refresh(spreadsheetId: string): Promise<ApplicationCatalogRead>;
+}
+
+export interface ApplicationSnapshotStore {
+  load(spreadsheetId: string): Promise<StoredApplication[] | null>;
+  save(
+    spreadsheetId: string,
+    rows: readonly StoredApplication[],
+  ): Promise<void>;
+  clear(): Promise<void>;
+}
+
+export interface SyncFailureNotifier {
+  failed(message: string): Promise<void>;
+  cleared(): Promise<void>;
+}
+
 export interface ApplicationWriter {
   insertApplication(
     spreadsheetId: string,

@@ -142,7 +142,7 @@ describe('GoogleSheetsGateway insertApplication', () => {
     ).toBe(false);
   });
 
-  it('does not send a batch when column H is not ordered', async () => {
+  it('does not send a batch when Postulé le runs from December toward January', async () => {
     const fetchImpl = vi.fn<typeof fetch>(async (input) => {
       const url = String(input);
 
@@ -158,6 +158,127 @@ describe('GoogleSheetsGateway insertApplication', () => {
             values: [
               [sheetSerialFromCivilDate('2026-03-01')],
               [sheetSerialFromCivilDate('2026-01-01')],
+            ],
+          },
+        ],
+      });
+    });
+    const gateway = new GoogleSheetsGateway(auth, fetchImpl);
+
+    await expect(gateway.insertApplication('sheet-id', draft)).resolves.toEqual(
+      { status: 'unsorted' },
+    );
+    expect(
+      fetchImpl.mock.calls.some((call) =>
+        String(call[0]).includes('batchUpdate'),
+      ),
+    ).toBe(false);
+  });
+
+  it('repaints shifted zebra rows and leaves a custom background in place', async () => {
+    const white = { red: 1, green: 1, blue: 1 };
+    const custom = { red: 1, green: 0.8, blue: 0.4 };
+    const fetchImpl = vi.fn<typeof fetch>(async (input, init) => {
+      const url = String(input);
+
+      if (url.includes('sheets.properties')) {
+        return json({
+          sheets: [{ properties: { title: '2026', sheetId: 42 } }],
+        });
+      }
+
+      if (url.includes('UNFORMATTED_VALUE')) {
+        return json({
+          valueRanges: [
+            {
+              values: [
+                [sheetSerialFromCivilDate('2026-01-01')],
+                [sheetSerialFromCivilDate('2026-03-01')],
+              ],
+            },
+          ],
+        });
+      }
+
+      if (url.includes('effectiveFormat')) {
+        return json({
+          sheets: [
+            {
+              data: [
+                {
+                  rowData: [
+                    { values: [cell(white), cell(white)] },
+                    { values: [cell(custom), cell(custom)] },
+                  ],
+                },
+              ],
+            },
+          ],
+        });
+      }
+
+      if (init?.body != null) {
+        return json({});
+      }
+
+      return json({});
+    });
+    const gateway = new GoogleSheetsGateway(auth, fetchImpl);
+
+    await expect(gateway.insertApplication('sheet-id', draft)).resolves.toEqual(
+      { status: 'inserted' },
+    );
+
+    const post = fetchImpl.mock.calls.find((call) =>
+      String(call[0]).includes('batchUpdate'),
+    );
+    const body = JSON.parse(String(post?.[1]?.body)) as {
+      requests: Array<{
+        repeatCell?: {
+          fields?: string;
+          range?: { startRowIndex?: number };
+          cell?: {
+            userEnteredFormat?: {
+              backgroundColor?: { red: number; green: number; blue: number };
+            };
+          };
+        };
+      }>;
+    };
+    const backgrounds = body.requests.filter(
+      (request) =>
+        request.repeatCell?.fields === 'userEnteredFormat.backgroundColor',
+    );
+
+    expect(
+      backgrounds.map((request) => request.repeatCell?.range?.startRowIndex),
+    ).toEqual([2]);
+    expect(
+      backgrounds[0]?.repeatCell?.cell?.userEnteredFormat?.backgroundColor,
+    ).toEqual({
+      red: 246 / 255,
+      green: 248 / 255,
+      blue: 249 / 255,
+    });
+  });
+
+  it('does not send a batch when column H mixes both date orders', async () => {
+    const fetchImpl = vi.fn<typeof fetch>(async (input) => {
+      const url = String(input);
+
+      if (url.includes('sheets.properties')) {
+        return json({
+          sheets: [{ properties: { title: '2026', sheetId: 42 } }],
+        });
+      }
+
+      return json({
+        valueRanges: [
+          {
+            values: [
+              [sheetSerialFromCivilDate('2026-01-01')],
+              [sheetSerialFromCivilDate('2026-03-01')],
+              [sheetSerialFromCivilDate('2026-02-01')],
             ],
           },
         ],
@@ -193,4 +314,12 @@ describe('GoogleSheetsGateway insertApplication', () => {
 
 function json(body: unknown): Response {
   return new Response(JSON.stringify(body), { status: 200 });
+}
+
+function cell(backgroundColor: { red: number; green: number; blue: number }): {
+  effectiveFormat: {
+    backgroundColor: { red: number; green: number; blue: number };
+  };
+} {
+  return { effectiveFormat: { backgroundColor } };
 }

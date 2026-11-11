@@ -83,9 +83,23 @@ describe('chronologicalInsertionIndex', () => {
     ).toBe(2);
   });
 
-  it('refuses a column that is not in ascending order', () => {
+  it('puts a later date below and an earlier date above', () => {
+    expect(chronologicalInsertionIndex(['2026-01-01'], '2026-12-31')).toBe(1);
+    expect(chronologicalInsertionIndex(['2026-12-31'], '2026-01-01')).toBe(0);
+  });
+
+  it('refuses a column that runs from December toward January', () => {
     expect(
-      chronologicalInsertionIndex(['2026-02-02', '2026-01-01'], '2026-01-20'),
+      chronologicalInsertionIndex(['2026-12-31', '2026-01-01'], '2026-06-01'),
+    ).toBeNull();
+  });
+
+  it('refuses a column that mixes both orders', () => {
+    expect(
+      chronologicalInsertionIndex(
+        ['2026-01-01', '2026-03-01', '2026-02-01'],
+        '2026-02-15',
+      ),
     ).toBeNull();
   });
 });

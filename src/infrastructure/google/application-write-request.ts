@@ -13,6 +13,19 @@ export type ApplicationWritePlan = {
   referenceIndex: number | null;
   copyFormula: boolean;
   cells: readonly ApplicationCell[];
+  zebraGridIndexes?: readonly number[];
+};
+
+export type SheetBackground = {
+  red?: number;
+  green?: number;
+  blue?: number;
+};
+
+export type RowPaint = 'zebra' | 'custom';
+
+type PaintedCell = {
+  effectiveFormat?: { backgroundColor?: SheetBackground };
 };
 
 type SheetProperties = {
@@ -75,9 +88,95 @@ export function applicationWriteRequests(plan: ApplicationWritePlan): object[] {
     requests.push(dateUpdate(plan, date.numberValue));
   }
 
-  requests.push(rowBackground(plan), linkTextColor(plan));
+  for (const gridIndex of plan.zebraGridIndexes ?? [plan.destinationIndex]) {
+    requests.push(rowBackground(plan.sheetId, gridIndex));
+  }
+
+  requests.push(linkTextColor(plan));
 
   return requests;
+}
+
+export function paintsFromGrid(
+  rows: readonly ({ values?: readonly PaintedCell[] } | null | undefined)[],
+  dateCount: number,
+): RowPaint[] {
+  return Array.from({ length: dateCount }, (_, index) =>
+    rowPaint(
+      rows[index]?.values?.map((cell) => cell.effectiveFormat?.backgroundColor),
+    ),
+  );
+}
+
+export function rowPaint(
+  colors: readonly (SheetBackground | null | undefined)[] | undefined,
+): RowPaint {
+  return keepsCustomBackground(colors ?? []) ? 'custom' : 'zebra';
+}
+
+export function zebraGridIndexesAfterInsert(
+  paints: readonly RowPaint[],
+  insertionIndex: number,
+): number[] {
+  const indexes = [insertionIndex + 1];
+
+  for (let index = insertionIndex; index < paints.length; index += 1) {
+    if (paints[index] !== 'zebra') {
+      continue;
+    }
+
+    indexes.push(index + 2);
+  }
+
+  return indexes;
+}
+
+function keepsCustomBackground(
+  colors: readonly (SheetBackground | null | undefined)[],
+): boolean {
+  if (colors.length === 0) {
+    return false;
+  }
+
+  const painted = colors.map(normalizeBackground);
+  const first = painted[0];
+
+  if (first == null || painted.some((color) => !sameColor(color, first))) {
+    return true;
+  }
+
+  return !sameColor(first, EVEN_ROW) && !sameColor(first, ODD_ROW);
+}
+
+function normalizeBackground(color: SheetBackground | null | undefined): {
+  red: number;
+  green: number;
+  blue: number;
+} {
+  if (color == null) {
+    return EVEN_ROW;
+  }
+
+  return {
+    red: color.red ?? 0,
+    green: color.green ?? 0,
+    blue: color.blue ?? 0,
+  };
+}
+
+function sameColor(
+  left: { red: number; green: number; blue: number },
+  right: { red: number; green: number; blue: number },
+): boolean {
+  return (
+    colorChannel(left.red) === colorChannel(right.red) &&
+    colorChannel(left.green) === colorChannel(right.green) &&
+    colorChannel(left.blue) === colorChannel(right.blue)
+  );
+}
+
+function colorChannel(value: number): number {
+  return Math.round(value * 255);
 }
 
 function copyPaste(
@@ -176,15 +275,15 @@ function dateUpdate(plan: ApplicationWritePlan, serial: number): object {
   };
 }
 
-function rowBackground(plan: ApplicationWritePlan): object {
-  const sheetRow = plan.destinationIndex + 1;
+function rowBackground(sheetId: number, gridIndex: number): object {
+  const sheetRow = gridIndex + 1;
 
   return {
     repeatCell: {
       range: {
-        sheetId: plan.sheetId,
-        startRowIndex: plan.destinationIndex,
-        endRowIndex: plan.destinationIndex + 1,
+        sheetId,
+        startRowIndex: gridIndex,
+        endRowIndex: gridIndex + 1,
       },
       cell: {
         userEnteredFormat: {

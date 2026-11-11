@@ -19,6 +19,8 @@ import {
   annualSheetId,
   applicationWriteRequests,
   isSheetFormula,
+  paintsFromGrid,
+  zebraGridIndexesAfterInsert,
 } from '@/src/infrastructure/google/application-write-request';
 import {
   annualSheetTitles,
@@ -382,6 +384,13 @@ export class GoogleSheetsGateway {
 
     const dateCount = filledColumnLength(column);
     const referenceIndex = dateCount === 0 ? null : index === 0 ? 2 : index;
+    const zebraGridIndexes = await this.zebraRowsAfterInsert(
+      token,
+      spreadsheetId,
+      year,
+      dateCount,
+      index,
+    );
     const formulas =
       referenceIndex == null
         ? null
@@ -411,8 +420,62 @@ export class GoogleSheetsGateway {
         referenceIndex,
         copyFormula,
         cells: applicationCells(draft, { includeAnnualSalary: !copyFormula }),
+        ...(zebraGridIndexes == null ? {} : { zebraGridIndexes }),
       }),
     };
+  }
+
+  private async zebraRowsAfterInsert(
+    token: string,
+    spreadsheetId: string,
+    year: string,
+    dateCount: number,
+    insertionIndex: number,
+  ): Promise<number[] | undefined> {
+    if (dateCount === 0) {
+      return undefined;
+    }
+
+    const params = new URLSearchParams({
+      includeGridData: 'true',
+      fields: 'sheets.data.rowData.values.effectiveFormat.backgroundColor',
+    });
+    params.append(
+      'ranges',
+      `${quoteSheetTitle(year)}!A2:Q${String(dateCount + 1)}`,
+    );
+    const grid = await this.getJson<{
+      sheets?: Array<{
+        data?: Array<{
+          rowData?: Array<{
+            values?: Array<{
+              effectiveFormat?: {
+                backgroundColor?: {
+                  red?: number;
+                  green?: number;
+                  blue?: number;
+                };
+              };
+            }>;
+          }>;
+        }>;
+      }>;
+    }>(token, spreadsheetId, params);
+
+    if (grid.status !== 'ok') {
+      return undefined;
+    }
+
+    const rowData = grid.body.sheets?.[0]?.data?.[0]?.rowData;
+
+    if (rowData == null || rowData.length < dateCount) {
+      return undefined;
+    }
+
+    return zebraGridIndexesAfterInsert(
+      paintsFromGrid(rowData, dateCount),
+      insertionIndex,
+    );
   }
 
   private async accessToken(): Promise<
