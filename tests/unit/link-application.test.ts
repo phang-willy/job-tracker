@@ -188,6 +188,27 @@ describe('LinkApplication', () => {
     ).resolves.toEqual({ status: 'found', application: stored });
   });
 
+  it('does not insert from a stale copy when the fresh read fails', async () => {
+    const insertApplication = vi.fn();
+    const listApplications = vi.fn(() =>
+      Promise.resolve({ status: 'ok' as const, rows: [] }),
+    );
+
+    await expect(
+      new LinkApplication(
+        { listApplications },
+        { insertApplication },
+        settings,
+        { execute: () => Promise.resolve('failed') },
+      ).execute(draft),
+    ).resolves.toEqual({
+      status: 'unavailable',
+      detail: 'La synchronisation du tableur a échoué.',
+    });
+    expect(insertApplication).not.toHaveBeenCalled();
+    expect(listApplications).not.toHaveBeenCalled();
+  });
+
   it('refreshes the stored copy before the write and again before the reread', async () => {
     const execute = vi.fn(() => Promise.resolve('synced'));
     const insertApplication = vi.fn(() =>

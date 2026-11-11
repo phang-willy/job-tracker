@@ -98,7 +98,14 @@ export class LinkApplication {
   }
 
   private async listed(spreadsheetId: string): Promise<ApplicationCatalogRead> {
-    await this.refreshCatalog?.execute();
+    const refreshed = await this.refreshCatalog?.execute();
+
+    if (refreshed === 'failed') {
+      return {
+        status: 'unavailable',
+        detail: 'La synchronisation du tableur a échoué.',
+      };
+    }
 
     return this.catalog.listApplications(spreadsheetId);
   }

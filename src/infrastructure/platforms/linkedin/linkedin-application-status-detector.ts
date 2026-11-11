@@ -206,7 +206,7 @@ function lastStatusItem(heading: Element): Element | null {
       return items[items.length - 1] ?? null;
     }
 
-    const parent = current.parentElement;
+    const parent: HTMLElement | null = current.parentElement;
 
     if (parent == null || parent === current.ownerDocument.body) {
       break;
